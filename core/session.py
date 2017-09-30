@@ -1,6 +1,5 @@
 from __future__ import absolute_import
-from flask import session, redirect, url_for, abort, request
-from functools import wraps
+from flask import session
 import cPickle
 import uuid
 import time
@@ -123,26 +122,3 @@ class SessionManager(object):
             self.sql('INSERT INTO temporary_storage (id, data_pickle, data_len, compressed, last_activity) VALUES(%s, %s, %s, %s, UNIX_TIMESTAMP(NOW()))', self.hash, data, data_len, int(compressed))
         else:
             self.sql('UPDATE temporary_storage SET data_pickle = %s, data_len = %s, compressed = %s, last_activity = UNIX_TIMESTAMP(NOW()) WHERE id = %s', data, data_len, int(compressed), self.hash)
-            
-
-def session_start(mysql, require_login=False, require_admin=False):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            url = '{}?{}'.format(url_for(func.__name__, **kwargs), request.query_string)
-            with SessionManager(mysql) as session:
-            
-                if require_admin:
-                    if not session.get('admin', False):
-                        session['admin_redirect'] = url
-                        abort(401)
-                        return redirect(url_for('unauthorized'))
-                        
-                if require_login:
-                    if not session.get('account_id', 0):
-                        session['login_redirect'] = url
-                        return redirect(url_for('login'))
-                        
-                return func(session=session, *args, **kwargs)
-        return wrapper
-    return decorator
