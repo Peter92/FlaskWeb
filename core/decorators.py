@@ -1,9 +1,33 @@
+#These are the decorators to be used with the function for each web page.
+#The order may go something like below:
+#
+#   @app.route('/account')
+#   @session_start(mysql)
+#   @require_login
+#   @set_template('account.html')
+#   def account_page(session):
+#       return dict(account_id = session['account_id'])
+
 from __future__ import absolute_import
 from functools import wraps
-from flask import redirect, url_for, abort, request, make_response
+from flask import redirect, url_for, abort, request, make_response, render_template
 
 from core.session import SessionManager
 
+
+def set_template(template):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            result = func(*args, **kwargs)
+            if result is None:
+                result = {}
+            elif not isinstance(result, dict):
+                return result
+            return render_template(template, **result)
+        return wrapper
+    return decorator
+    
 
 def _get_redirect_url(func, *args, **kwargs):
     if request.query_string:
@@ -11,7 +35,7 @@ def _get_redirect_url(func, *args, **kwargs):
     else:
         return url_for(func.__name__, **kwargs)
 
-        
+
 def session_start(mysql, require_login=False, require_admin=False):
     def decorator(func):
         @wraps(func)
