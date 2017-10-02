@@ -1,9 +1,10 @@
 from __future__ import absolute_import
-from flask import session
+from flask import session, abort
 import cPickle
 import uuid
 import time
 import zlib
+import time
 
 from core.hash import quick_hash
 import core.tracking as tracking
@@ -60,16 +61,33 @@ class SessionManager(object):
     def items(self):
         return self.data.items()
     
+    def _check_ban_ip(self):
+        """Don't allow IP to access site while banned."""
+        banned_until = self.sql('SELECT ban_until FROM ip_addresses WHERE id = %s', self.data['ip_id'])[0][0]
+        if banned_until > time.time():
+            abort(408)
+    
     def new(self):
         self.regenerate()
         self.data = {}
+        self._get_user_data()
+        self._check_ban_ip()
         self._track_start()
+    
+    def _get_user_data(self):
+        self.data['ip_id'] = tracking.get_ip_id(self.sql)
+        self.data['ua_id'] = tracking.get_ua_id(self.sql)
+        self.data['language_id'] = tracking.get_language_id(self.sql)
+        self.data['referrer_id'] = tracking.get_referrer_id(self.sql)
     
     def _track_continue(self):
         """Record a new page visit."""
+
+        self._check_ban_ip()
+        
+        group_id = self.data['group_id']
         url_id = tracking.get_url_id(self.sql)
         last_id = self.data.get('url_id', 0)
-        group_id = self.data['group_id']
         
         if url_id == last_id:
             sql = 'UPDATE visit_pages SET refresh_count = refresh_count + 1 WHERE id = %s'
@@ -85,16 +103,12 @@ class SessionManager(object):
     
     def _track_start(self):
         """Start a tracking session."""
-        ip_id = tracking.get_ip_id(self.sql)
-        ua_id = tracking.get_ua_id(self.sql)
-        language_id = tracking.get_language_id(self.sql)
-        referrer_id = tracking.get_referrer_id(self.sql)
         account_id = self.data.get('account_id', 0)
         
         sql = ('INSERT INTO visit_groups'
                ' (account_id, ip_id, user_agent_id, referrer_id, language_id, time_started, last_activity)'
                ' VALUES (%s, %s, %s, %s, %s, UNIX_TIMESTAMP(NOW()), UNIX_TIMESTAMP(NOW()))')
-        group_id = self.sql(sql, account_id, ip_id, ua_id, referrer_id, language_id)
+        group_id = self.sql(sql, account_id, self.data['ip_id'], self.data['ua_id'], self.data['referrer_id'], self.data['language_id'])
         self.data['group_id'] = group_id
 
     def regenerate(self):
