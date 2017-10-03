@@ -100,12 +100,11 @@ def validate_length(min_length=None, max_length=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             value_len = len(args[0])
-            allow_empty = kwargs.get('empty', False)
-            if not value_len and not allow_empty:
+            if not value_len and not kwargs.get('empty', False):
                 kwargs['_error_ids'].append(VALIDATION_ERROR_EMPTY)
-            elif min_length is not None and 0 < value_len < min_length:
+            elif min_length is not None and value_len < min_length and not kwargs.get('ignore_short', False):
                 kwargs['_error_ids'].append(VALIDATION_ERROR_SHORT)
-            elif max_length is not None and value_len > max_length:
+            elif max_length is not None and value_len > max_length and not kwargs.get('ignore_long', False):
                 kwargs['_error_ids'].append(VALIDATION_ERROR_LONG)
             return func(*args, **kwargs)
         return wrapper
@@ -168,10 +167,12 @@ def validate_prepare(func):
 def validate_finalize(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        try:
-            del kwargs['empty']
-        except KeyError:
-            pass
+        remove_kwargs = ['empty', 'ignore_short', 'ignore_long']
+        for i in remove_kwargs:
+            try:
+                del kwargs[i]
+            except KeyError:
+                pass
         return func(*args, **kwargs)
     return wrapper
 
