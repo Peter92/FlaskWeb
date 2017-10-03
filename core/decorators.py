@@ -12,6 +12,7 @@ from __future__ import absolute_import
 from functools import wraps
 from flask import redirect, url_for, abort, request, make_response, render_template
 
+from core.constants import *
 from core.session import SessionManager
 
 
@@ -24,7 +25,7 @@ def set_template(template):
                 result = {}
             elif not isinstance(result, dict):
                 return result
-            return render_template(template, **result)
+            return render_template(template, form_data=request.form, **result)
         return wrapper
     return decorator
     
@@ -49,26 +50,31 @@ def session_start(mysql, require_login=False, require_admin=False):
 def require_admin(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        session = kwargs.pop('session')
-        if not session.get('admin', False):
-            session['admin_redirect'] = _get_redirect_url(func)
+        if kwargs['session'].get('account_data', {}).get('permission', 0) < PERMISSION_ADMIN:
+            kwargs['session']['admin_redirect'] = _get_redirect_url(func)
             return add_response_headers(redirect(url_for('unauthorized')))
-        return func(session=session, *args, **kwargs)
+        return func(*args, **kwargs)
     return wrapper
     
     
 def require_login(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        session = kwargs.pop('session')
-        if not session.get('account_id', 0):
-            session['login_redirect'] = _get_redirect_url(func)
+        if not kwargs['session'].get('account_data', {}).get('id', 0):
+            kwargs['session']['login_redirect'] = _get_redirect_url(func)
             return add_response_headers(redirect(url_for('login')))
-        return func(session=session, *args, **kwargs)
+        return func(*args, **kwargs)
     return wrapper
 
-    
+
 def add_response_headers(output):
+    """Add any custom headers to the page before it is processed."""
     resp = make_response(output)
-    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers['X-Frame-Options'] = "DENY"
+    resp.headers['X-XSS-Protection'] = 1
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    if not PRODUCTION_SERVER:
+        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        resp.headers['Pragma'] = 'no-cache'
+        resp.headers['Expires'] = 0
     return resp
