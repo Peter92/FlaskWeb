@@ -1,17 +1,18 @@
 {% extends "layout.html" %}
+{% set active_page = 'register' %}
 {% block body %}
   <h2>Register</h2>
   {% for message in errors %}<p class=error><strong>Error:</strong> {{ message }}{% endfor %}
   <form action="{{ url_for('register') }}" method=post>
     <dl>
       <dt>Email:
-      <dd><input type="text" name="email" value="{{ form_data.get('email', '') }}">
+      <dd><input type="text" name="email" value="{{ post_data.get('email', '') or get_data.get('email', '') }}">
       <dt>Username (optional):
-      <dd><input type="text" name="username" value="{{ form_data.get('username', '') }}">
+      <dd><input type="text" name="username" value="{{ post_data.get('username', '') or get_data.get('username', '') }}">
       <dt>Password:
-      <dd><input type="password" name="password" value="{{ form_data.get('password', '') }}">
+      <dd><input type="password" name="password" value="{{ post_data.get('password', '') }}">
       <dt>Password (confirm):
-      <dd><input type="password" name="password_confirm" value="{{ form_data.get('password_confirm', '') }}">
+      <dd><input type="password" name="password_confirm" value="{{ post_data.get('password_confirm', '') }}">
       <dd><input type="submit" value="Register">
     </dl>
   </form>
