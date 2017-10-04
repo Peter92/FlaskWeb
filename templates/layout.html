@@ -1,17 +1,38 @@
 <!doctype html>
-<title>Flaskr</title>
-<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
-<div class=page>
-  <h1>Flaskr</h1>
-  <div class=metanav>
-  {% if not session.logged_in %}
-    <a href="{{ url_for('login') }}">log in</a>
-  {% else %}
-    <a href="{{ url_for('logout') }}">log out</a>
-  {% endif %}
-  </div>
-  {% for message in get_flashed_messages() %}
-    <div class=flash>{{ message }}</div>
-  {% endfor %}
-  {% block body %}{% endblock %}
-</div>
+<html>
+  <head>
+    <title>{% block title %}{% endblock %} | Website</title>
+    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}?refresh=3">
+  </head>
+  {% set navigation_bar = [
+      (url_for('index'), 'index', 'Index'),
+      (url_for('login'), 'login', 'Login'),
+      (url_for('register'), 'register', 'Register'),
+      (url_for('account'), 'account', 'Account')
+  ] %}
+  <body>
+    <ul id="navigation">
+      {% for href, id, caption in navigation_bar %}
+        <li{% if id == active_page %} class="active"{% endif %}><a href="{{ href|e }}">{{ caption|e }}</a></li>
+      {% endfor %}
+    </ul>
+    <div class=page>
+      <h1>Template</h1>
+      <div class=metanav>
+      {% if not session['account_data'].get('id', 0) %}
+        <a href="{{ page_url }}">log in</a>
+      {% else %}
+        <a href="{{ url_for('logout') }}">log out</a>
+      {% endif %}
+      </div>
+      <div id="content">{% block content %}{% endblock %}</div>
+      <div id="footer">
+        <font size="1">
+          {% block footer %}
+          &copy; Copyright 2017 by <a href="http://website.com/">Website</a>.
+          {% endblock %}
+        </font>
+      </div>
+    </div>
+  </body>
+</html>
