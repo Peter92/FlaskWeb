@@ -25,7 +25,7 @@ def set_template(template):
                 result = {}
             elif not isinstance(result, dict):
                 return result
-            return render_template(template, form_data=request.form, **result)
+            return render_template(template, get_data=request.args, post_data=request.form, **result)
         return wrapper
     return decorator
     
@@ -52,6 +52,7 @@ def require_admin(func):
     def wrapper(*args, **kwargs):
         if kwargs['session'].get('account_data', {}).get('permission', 0) < PERMISSION_ADMIN:
             kwargs['session']['admin_redirect'] = _get_redirect_url(func)
+            kwargs['session'].skip = True
             return add_response_headers(redirect(url_for('unauthorized')))
         return func(*args, **kwargs)
     return wrapper
@@ -62,6 +63,8 @@ def require_login(func):
     def wrapper(*args, **kwargs):
         if not kwargs['session'].get('account_data', {}).get('id', 0):
             kwargs['session']['login_redirect'] = _get_redirect_url(func)
+            kwargs['session']['allow_login_redirect'] = True
+            kwargs['session'].skip = True
             return add_response_headers(redirect(url_for('login')))
         return func(*args, **kwargs)
     return wrapper
