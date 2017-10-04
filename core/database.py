@@ -84,8 +84,8 @@ class DatabaseCommands(object):
         An existing ban doesn't need to be checked as it will not allow access to the site anyway.
         The remaining number of attempts will be returned.
         """
-        #Get how many failed logins
-        login_attempts = self.sql('SELECT count(*) FROM login_attempts WHERE success = 0 AND attempt_time > UNIX_TIMESTAMP(NOW()) - %s AND ip_id = %s', BAN_TIME_IP, ip_id)
+        #Get how many logins
+        login_attempts = self.sql('SELECT count(*) FROM login_attempts WHERE success >= 0 AND attempt_time > UNIX_TIMESTAMP(NOW()) - %s AND ip_id = %s', BAN_TIME_IP, ip_id)
         remaining_attempts = MAX_LOGIN_ATTEMPTS_IP - login_attempts
         
         #Ban IP if not enough remaining attempts
@@ -166,7 +166,7 @@ class DatabaseCommands(object):
             
         return length
     
-    def login_attempt_record(self, field_data, ip_id, success=False):
+    def login_attempt_record(self, field_data, ip_id, success=0):
         """Save a login attempt to use for rate limiting."""
         hash = quick_hash(field_data)
         attempt_id = self.sql('INSERT INTO login_attempts (field_data, ip_id, attempt_time, success) VALUES (%s, %s, UNIX_TIMESTAMP(NOW()), %s)', hash, ip_id, int(success))
@@ -176,42 +176,47 @@ class DatabaseCommands(object):
         
         return attempt_id
         
-    def login_attempt_invalidate(self, attempt_id):
-        """Invalidate a login attempt.
-        Does not delete as the offset is still used to calculate bans on accounts that don't exist.
-        """
-        result = self.sql('UPDATE login_attempts SET success = -1 WHERE id = %s', attempt_id)
-        
-        if not PRODUCTION_SERVER:
-            print 'Invalidated login attempt {}.'.format(attempt_id)
-            
-        return result
-        
-    def login(self, account_id, password, account_data, ip_id, login_attempt_id=None):
+    def login(self, account_id, password, ip_id=None, form_data=None):
     
-        fail = False
+        data = {'account': {}, 'warnings': [], 'errors': []}
         
         login_data = self.sql('SELECT password, email_id, username, password_changed, register_time, last_activity, credits, permission, activated, ban_until FROM accounts WHERE id = %s', account_id)
         if login_data and password_check(password, login_data[0][0]):
             
-            account_data['id'] = account_id
-            account_data['email_id'] = login_data[0][1]
-            account_data['username'] = login_data[0][2]
-            account_data['pw_update'] = login_data[0][3]
-            account_data['created'] = login_data[0][4]
-            account_data['last_seen'] = login_data[0][5]
-            account_data['credits'] = login_data[0][6]
-            account_data['permission'] = login_data[0][7]
-            account_data['activated'] = login_data[0][8]
-            account_data['ban_until'] = login_data[0][9]
+            valid = 1
+            data['account']['id'] = account_id
+            data['account']['email_id'] = login_data[0][1]
+            data['account']['username'] = login_data[0][2]
+            data['account']['pw_update'] = login_data[0][3]
+            data['account']['created'] = login_data[0][4]
+            data['account']['last_seen'] = login_data[0][5]
+            data['account']['credits'] = login_data[0][6]
+            data['account']['permission'] = login_data[0][7]
+            data['account']['activated'] = login_data[0][8]
+            data['account']['ban_until'] = login_data[0][9]
             
         else:
-            fail = True
+            valid = 0
+            data['errors'].append('Incorrect login details')
         
-        if not fail and login_attempt_id is not None:
-            self.sql('UPDATE login_attempts SET success = 1 WHERE id = %s', login_attempt_id)
+        #Check for bans
+        if ip_id is not None and form_data is not None:
+            self.login_attempt_record(form_data, ip_id, success=valid)
+            
+            remaining_attempts = self.failed_logins_ip(ip_id)
+            if remaining_attempts <= 10:
+                data['warnings'].append('You have {} more login attempt{} until your IP is temporarily banned.'.format(remaining_attempts, '' if remaining_attempts == 1 else 's'))
+            
+            remaining_attempts, ban_remaining = self.failed_logins_account(account_id, form_data)
+            if ban_remaining > 0:
+                data['errors'].append('Your account is disabled for another {} seconds.'.format(ban_remaining))
+                valid = -1
+            elif remaining_attempts <= 10:
+                data['warnings'].append('You have {} more login attempt{} before this account is temporarily disabled.'.format(remaining_attempts, '' if remaining_attempts == 1 else 's'))
             
         if not PRODUCTION_SERVER:
-            print 'Account with ID {} {} with login attempt.'.format(account_id, 'failed' if fail else 'succeeded')
+            print 'Account with ID {} {} with login attempt.'.format(account_id, 'failed' if valid < 1 else 'succeeded')
         
-        return not fail
+        data['status'] = valid
+        
+        return data
