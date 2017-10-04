@@ -1,14 +1,16 @@
 {% extends "layout.html" %}
+{% set active_page = 'login' %}
 {% block body %}
-  <h2>Login</h2>
-  {% if error %}<p class=error><strong>Error:</strong> {{ error }}{% endif %}
+  <h2>Login {% if login_redirect %}(redirected from {{ login_redirect }}){% endif %}</h2>
+  {% for message in errors %}<p class="error"><strong>Error:</strong> {{ message }}{% endfor %}
+  {% for message in warnings %}<p class="warning"><strong>Warning:</strong> {{ message }}{% endfor %}
   <form action="{{ url_for('login') }}" method=post>
     <dl>
-      <dt>Username:
-      <dd><input type=text name=username>
+      <dt>Username/Email:
+      <dd><input type="text" name="username" value="{{ post_data.get('username', '') or get_data.get('email', '') }}">
       <dt>Password:
-      <dd><input type=password name=password>
-      <dd><input type=submit value=Login>
+      <dd><input type="password" name="password" value="{{ post_data.get('password', '') }}" autofocus>
+      <dd><input type="submit" value="Login">
     </dl>
   </form>
 {% endblock %}
