@@ -46,6 +46,9 @@ def format_error_message(item_name, error_codes, unique_characters=None,
     
     errors = []
     
+    if isinstance(error_codes, int):
+        error_codes = [error_codes]
+    
     if VALIDATION_ERROR_EMPTY in error_codes:
         errors.append('{} is required.'.format(item_name))
     
@@ -100,8 +103,9 @@ def validate_length(min_length=None, max_length=None):
         @wraps(func)
         def wrapper(*args, **kwargs):
             value_len = len(args[0])
-            if not value_len and not kwargs.get('empty', False):
-                kwargs['_error_ids'].append(VALIDATION_ERROR_EMPTY)
+            if not value_len:
+                if not kwargs.get('empty', False):
+                    kwargs['_error_ids'].append(VALIDATION_ERROR_EMPTY)
             elif min_length is not None and value_len < min_length and not kwargs.get('ignore_short', False):
                 kwargs['_error_ids'].append(VALIDATION_ERROR_SHORT)
             elif max_length is not None and value_len > max_length and not kwargs.get('ignore_long', False):
