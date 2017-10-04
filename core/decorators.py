@@ -25,14 +25,34 @@ def set_template(template):
                 result = {}
             elif not isinstance(result, dict):
                 return result
-            return render_template(template, get_data=request.args, post_data=request.form, **result)
+                
+            #Catch login redirect request from url
+            if request.args.get('login', False):
+                return require_login(func)(*args, **kwargs)
+                
+            return render_template(template, 
+                                   get_data=request.args, post_data=request.form, session=kwargs['session'],
+                                   page_url=_get_redirect_url(func, _add_queries={'login': '1'}),
+                                   **result)
         return wrapper
     return decorator
     
 
-def _get_redirect_url(func, *args, **kwargs):
+def _get_redirect_url(func, _add_queries={}, *args, **kwargs):
+
+    #Remove unneeded query values
+    ignore = set(['login'])
+    query_list = []
     if request.query_string:
-        return '{}?{}'.format(url_for(func.__name__, **kwargs), request.query_string)
+        for query in request.query_string.split('&'):
+            if query.split('=', 1)[0].lower() not in ignore:
+                query_list.append(query)
+        
+    for k, v in _add_queries.iteritems():
+        query_list.append('{}={}'.format(k, v))
+    
+    if query_list:
+        return '{}?{}'.format(url_for(func.__name__, **kwargs), '&'.join(query_list))
     else:
         return url_for(func.__name__, **kwargs)
 
