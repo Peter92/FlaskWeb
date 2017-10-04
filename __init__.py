@@ -14,6 +14,8 @@ mysql = DatabaseConnection(DATABASE_HOST, DATABASE_NAME, DATABASE_USER, DATABASE
 
 #Functions below are just for testing different features and are a mess
 
+
+
 @app.route('/')
 @session_start(mysql)
 @set_template('index.html')
@@ -24,7 +26,7 @@ def index(session):
     except KeyError:
         session['count'] = 1
 
-    print session['count']
+    print session['count'], url_for('login', email='what')
     return str(session.keys())
 
 
@@ -33,13 +35,10 @@ def index(session):
 @set_template('register.html')
 def register(session):
     errors = []
-    print request.form
     if request.method == 'POST':
-           
+        
         errors += validate_email(request.form['email'])
-            
-        errors += validate_password(request.form['password'], request.form['password_confirm']) 
-            
+        errors += validate_password(request.form['password'], request.form['password_confirm'])
         errors += validate_username(request.form['username'], empty=True)         
         
         if not errors:
@@ -49,31 +48,84 @@ def register(session):
                 errors.append('Bcrypt failed to work, please get in touch if this continues.')
             else:
                 if result:
-                    print 'account created'
+                    return redirect(url_for('login', email=request.form['email']))
                 else:
-                    errors += format_error_message('Email address', VALIDATION_ERROR_EXISTS)
+                    errors += format_error_message('Email address', [VALIDATION_ERROR_EXISTS])
                     
-
-    return dict(errors=errors, form_data=request.form)
+    return dict(errors=errors)
 
 
 @app.route('/login', methods=['GET', 'POST'])
 @session_start(mysql)
 @set_template('login.html')
 def login(session):
-    if request.method == 'POST':
-        print escape(request.form['username'])
-        
-        hashed = password_hash(request.form['password'], rounds=11)
-
-        print password_check(password, hashed)
+    warnings = []
+    errors = []
     
     try:
-        go_to_page = session.pop('login_redirect')
+        login_redirect = session['login_redirect']
     except KeyError:
-        go_to_page = None
-    print 'redirect to {}'.format(go_to_page)
-    return dict(x='5')
+        login_redirect = None
+    
+    if request.method == 'POST':
+
+        #Don't allow login if page hasn't already been visited (may be a bot)
+        if not session.get('allow_login', False):
+            errors.append('Error when logging in.')
+
+        else:
+
+            #Validate and figure out if input was email or username
+            valid_email = not validate_email(request.form['username'])
+            valid_username = not validate_username(request.form['username'], ignore_short=True, ignore_long=True)
+            if not valid_email and not valid_username:
+                errors.append('Invalid username/email.')
+            login_email = request.form['username'] if valid_email else None
+            login_username = request.form['username'] if valid_username else None
+
+            #Attempt to log in
+            if not errors:
+                
+                account_id = mysql.command.get_account_id(email=login_email, username=login_username)
+                result = mysql.command.login(account_id, request.form['password'], session['ip_id'], request.form['username'])
+
+                if result['status'] > 0:
+                    session.regenerate()
+                    
+                    session['account_data'] = result['account']
+                    session['account_data']['captcha_check'] = False
+
+                    #lookup known ips for said account
+                    #if no match then ask for captcha
+
+                    #update visit group with account id
+
+                    if login_redirect is None:
+                        return redirect(url_for('account'))
+                    else:
+                        return redirect(login_redirect)
+                    
+                else:
+                    session['account_data'] = {}
+                    errors += result['errors']
+                    warnings += result['warnings']
+            
+    else:
+        session['allow_login'] = True
+        if not session.get('allow_login_redirect', False):
+            try:
+                del session['login_redirect']
+                login_redirect = None
+            except KeyError:
+                pass
+        
+    #Delete redirect flag so that redirect will only work if form is submitted now
+    try:
+        del session['allow_login_redirect']
+    except KeyError:
+        pass
+    
+    return dict(errors=errors, warnings=warnings, login_redirect=login_redirect)
     
 
 @app.route('/account')
