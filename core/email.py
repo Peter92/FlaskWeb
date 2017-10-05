@@ -10,6 +10,7 @@ import smtplib
 from extensions.html2text import html2text
 
 def form_message(sender, receivers, subject, body, attachments=[]):
+    """Create the email body with correctly formatted information."""
 
     msg = MIMEMultipart('alternative')
     msg['To'] = ', '.join(receivers)
@@ -38,19 +39,25 @@ def form_message(sender, receivers, subject, body, attachments=[]):
 
 
 class Mail(object):
+    """Easily send email with attachments.
+    
+    Use the Mail.replace() option for
+    
+    Example usage:
+        mail = Mail('Email Subject', html_body)
+        mail.add_recipient('name@email.com', 'Name')
+        mail.add_recipient('unknown@email.com')
+        if mail.send_with_papercut():
+            redirect(url_when_succeeds)
+        else:
+            redirect(url_when_fails)
+    """
     def __init__(self, subject, body, attachments=None):            
         self.subject = subject
         self.body = body
         self.attachments = []
         self.replacements = {}
         self.recipients = []
-
-    def _body_replacement(self):
-        """Apply any replacements to the body of the message."""
-        body = self.body
-        for k, v in self.replacements.iteritems():
-            body.replace(k, v)
-        return body
 
     def add_recipient(self, email, name=None):
         if name is not None:
@@ -65,12 +72,11 @@ class Mail(object):
         self.replacements[value] = replacement
 
     def send_with_papercut(self):
-                 
+        """Send email with the papercut program (for local testing)."""
         sender = 'Papercut@Papercut.com'
         recipients = ['Papercut@user.com']
 
-        body = self._body_replacement()
-        msg = form_message(sender, recipients, self.subject, body, self.attachments)
+        msg = form_message(sender, recipients, self.subject, self.body, self.attachments)
         try:
             server = smtplib.SMTP('localhost')
             server.sendmail(sender, recipients, msg)
@@ -82,9 +88,14 @@ class Mail(object):
         return False
         
     def send_with_gmail(self, username, password):
+        """Send email through gmail with SSL enabled.
         
-        body = self._body_replacement()
-        msg = form_message(username, self.recipients, self.subject, body, self.attachments)
+        Rough limits (may be outdated):
+        Gmail: 500 emails per day, 20 emails per hour
+        Google Apps: 2000 emails per day
+        """
+        
+        msg = form_message(username, self.recipients, self.subject, self.body, self.attachments)
         try:
             server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
             server.ehlo()
