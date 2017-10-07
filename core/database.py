@@ -3,6 +3,8 @@ import pymysql
 
 from core.constants import *
 from core.hash import *
+from core.tracking import get_url_id
+from core.validation import *
 
 
 class DatabaseConnection(object):
@@ -44,7 +46,7 @@ class DatabaseCommands(object):
             return self.sql('SELECT id FROM emails WHERE email_address = %s', email)[0][0]
         except IndexError:
             if insert:
-                return self.sql('INSERT INTO emails (email_address, time_added) VALUES (%s, UNIX_TIMESTAMP(NOW()))', email)
+                return self.sql('INSERT INTO emails (email_address) VALUES (%s)', email)
         return 0
     
     def get_account_id(self, email=None, username=None, email_id=None):
@@ -66,18 +68,32 @@ class DatabaseCommands(object):
         except IndexError:
             return 0
     
-    def insert_account(self, email, password, username='NULL'):
+    def insert_account(self, email, password, username=None):
         """Add an account to the database and return the ID."""
         email_id = self.get_email_id(email)
+        
+        #Check if email or username already exists
+        errors = []
         if self.sql('SELECT count(*) FROM accounts WHERE email_id = %s', email_id):
-            return False
-        sql = 'INSERT INTO accounts (email_id, username, password, password_changed, register_time, last_activity, permission)'
-        sql += ' VALUES (%s, %s, %s, UNIX_TIMESTAMP(NOW()), UNIX_TIMESTAMP(NOW()), UNIX_TIMESTAMP(NOW()), %s)'
+            errors.append('Email address is already in use.')
+        if username:
+            if self.sql('SELECT count(*) FROM accounts WHERE username = %s', username):
+                errors.append('Username is already in use.')
+        else:
+            username = 'NULL'
         
-        if not PRODUCTION_SERVER:
-            print 'Account created for "{}"'.format(email)
-        
-        return self.sql(sql, email_id, username, password_hash(password), PERMISSION_REGISTERED)
+        #Insert into database
+        if not errors:
+            sql = 'INSERT INTO accounts (email_id, username, password, permission)'
+            sql += ' VALUES (%s, %s, %s, %s)'
+            
+            if not PRODUCTION_SERVER:
+                print 'Account created for "{}"'.format(email)
+            
+            status = self.sql(sql, email_id, username, password_hash(password), PERMISSION_REGISTERED)
+        else:
+            status = 0
+        return dict(status=status, errors=errors)
     
     def failed_logins_ip(self, ip_id):
         """Check how many login attempts remain for an IP.
@@ -119,12 +135,12 @@ class DatabaseCommands(object):
             remaining_attempts = 0
         else:
             try:
-                last_login = self.sql('SELECT attempt_time FROM login_attempts WHERE success = 1 AND field_data = %s ORDER BY attempt_time DESC LIMIT 1', hash)[0][0]
+                last_login = self.sql('SELECT attempt_time FROM login_attempts WHERE success = 1 AND BINARY field_data = %s ORDER BY attempt_time DESC LIMIT 1', hash)[0][0]
             except IndexError:
                 last_login = 0
             
             #Get how many failed logins
-            failed_logins = self.sql('SELECT count(*) FROM login_attempts WHERE attempt_time > GREATEST(%s, UNIX_TIMESTAMP(NOW()) - %s) AND field_data = %s', last_login, BAN_TIME_ACCOUNT, hash)
+            failed_logins = self.sql('SELECT count(*) FROM login_attempts WHERE attempt_time > GREATEST(%s, UNIX_TIMESTAMP(NOW()) - %s) AND BINARY field_data = %s', last_login, BAN_TIME_ACCOUNT, hash)
             remaining_attempts = MAX_LOGIN_ATTEMPTS_ACCOUNT - failed_logins
             
             #Ban account if not enough remaining attempts
@@ -134,7 +150,7 @@ class DatabaseCommands(object):
                 #Workaround to get psuedo-ban for account that don't exist
                 if not account_id:
                     try:
-                        ban_offset = self.sql('SELECT UNIX_TIMESTAMP(NOW()) - attempt_time FROM login_attempts WHERE success < 1 AND field_data = %s ORDER BY attempt_time DESC LIMIT 1 OFFSET {}'.format(-remaining_attempts), hash)[0][0]
+                        ban_offset = self.sql('SELECT UNIX_TIMESTAMP(NOW()) - attempt_time FROM login_attempts WHERE success < 1 AND BINARY field_data = %s ORDER BY attempt_time DESC LIMIT 1 OFFSET {}'.format(-remaining_attempts), hash)[0][0]
                         print ban_offset
                     except IndexError:
                         ban_offset = 0
@@ -169,14 +185,14 @@ class DatabaseCommands(object):
     def login_attempt_record(self, field_data, ip_id, success=0):
         """Save a login attempt to use for rate limiting."""
         hash = quick_hash(field_data)
-        attempt_id = self.sql('INSERT INTO login_attempts (field_data, ip_id, attempt_time, success) VALUES (%s, %s, UNIX_TIMESTAMP(NOW()), %s)', hash, ip_id, int(success))
+        attempt_id = self.sql('INSERT INTO login_attempts (field_data, ip_id, success) VALUES (%s, %s, %s)', hash, ip_id, int(success))
         
         if not PRODUCTION_SERVER:
             print 'Recorded login attempt for "{}" with IP {}.'.format(field_data, ip_id)
         
         return attempt_id
         
-    def login(self, account_id, password, ip_id=None, form_data=None):
+    def login(self, account_id, password, group_id=None, ip_id=None, form_data=None):
     
         data = {'account': {}, 'warnings': [], 'errors': []}
         
@@ -217,6 +233,15 @@ class DatabaseCommands(object):
         if not PRODUCTION_SERVER:
             print 'Account with ID {} {} with login attempt.'.format(account_id, 'failed' if valid < 1 else 'succeeded')
         
+        #Update database tables if successful login
+        if valid == 1:
+            if group_id is not None:
+                self.sql('UPDATE visit_groups SET account_id = %s WHERE id = %s', account_id, group_id)
+            self.sql('UPDATE accounts SET login_count = login_count + 1 WHERE id = %s', account_id)
+        
         data['status'] = valid
         
         return data
+        
+    def log_status_code(self, status_code, group_id):
+        self.sql('INSERT INTO status_codes (visit_group_id, url_id, status_code) VALUES (%s, %s, %s)', group_id, get_url_id(self.sql), status_code)
