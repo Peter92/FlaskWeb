@@ -6,35 +6,26 @@ import time
 import zlib
 import time
 
+from core.constants import *
 from core.hash import quick_hash
 import core.tracking as tracking
 
 
 SESSION_TIMEOUT = 3600
 
-
+from flask import request
 class SessionManager(object):
+    
+    MAX_LENGTH = 65535
+
     def __init__(self, db_connection):
         self.sql = db_connection.sql
+        self.skip = False
                 
     def __enter__(self):
-        try:
-            session_id = session['sid']
-            hash = quick_hash(session_id)
-            data_pickle, compressed, last_activity = self.sql('SELECT data_pickle, compressed, last_activity FROM temporary_storage WHERE id = %s', hash)[0]
-            
-            if last_activity > time.time() - SESSION_TIMEOUT:
-                if compressed:
-                    data_pickle = zlib.decompress(data_pickle)
-                self.data = cPickle.loads(data_pickle)
-                self.hash = hash
-                self._new_id = False
-                return self
-            
-        except IndexError:
-            pass
-            
-        self.new()
+        self._session_start()
+        self._check_ban_ip()
+        self.generate_csrf_token()
         return self
         
     def __getitem__(self, item):
@@ -42,6 +33,29 @@ class SessionManager(object):
     
     def __setitem__(self, item, value):
         self.data[item] = value
+        
+    def __delitem__(self, item):
+        del self.data[item]
+    
+    def _session_start(self):
+        """Load session data from database if possible."""
+        try:
+            session_id = session['sid']
+            hash = quick_hash(session_id)
+            data_pickle, compressed, last_activity = self.sql('SELECT data_pickle, compressed, last_activity FROM temporary_storage WHERE BINARY id = %s', hash)[0]
+            
+            if last_activity > time.time() - SESSION_TIMEOUT:
+                if compressed:
+                    data_pickle = zlib.decompress(data_pickle)
+                self.data = cPickle.loads(data_pickle)
+                self.hash = hash
+                self._new_id = False
+                return
+                
+        except (IndexError, KeyError):
+            pass
+            
+        self.new()
     
     def get(self, item, default):
         return self.data.get(item, default)
@@ -61,17 +75,29 @@ class SessionManager(object):
     def items(self):
         return self.data.items()
     
+    def exit(self):
+        """Stop the tracking code from running.
+        Meant to be used for redirects.
+        """
+        self.skip = True
+    
+    def generate_csrf_token(self, override=False):
+        if override or 'csrf_token' not in self.data:
+            self.data['csrf_token'] = uuid.uuid4().hex
+    
     def _check_ban_ip(self):
         """Don't allow IP to access site while banned."""
         banned_until = self.sql('SELECT ban_until FROM ip_addresses WHERE id = %s', self.data['ip_id'])[0][0]
+        
         if banned_until > time.time():
+            if not PRODUCTION_SERVER:
+                print 'IP {} tried to visit but is banned.'.format(self.data['ip_id'])
             abort(408)
     
     def new(self):
         self.regenerate()
-        self.data = {}
+        self.data = {'account_data': {}}
         self._get_user_data()
-        self._check_ban_ip()
         self._track_start()
     
     def _get_user_data(self):
@@ -82,8 +108,8 @@ class SessionManager(object):
     
     def _track_continue(self):
         """Record a new page visit."""
-
-        self._check_ban_ip()
+        if self.skip:
+            return
         
         group_id = self.data['group_id']
         url_id = tracking.get_url_id(self.sql)
@@ -93,12 +119,10 @@ class SessionManager(object):
             sql = 'UPDATE visit_pages SET refresh_count = refresh_count + 1 WHERE id = %s'
             self.sql(sql, self.data['visit_id'])
         else:
-            sql = 'INSERT INTO visit_pages (group_id, url_id, visit_time) VALUES (%s, %s, UNIX_TIMESTAMP(NOW()))'
+            sql = 'INSERT INTO visit_pages (group_id, url_id) VALUES (%s, %s)'
             id = self.sql(sql, group_id, url_id)
             self.data['visit_id'] = id
         
-        sql = 'UPDATE visit_groups SET last_activity = UNIX_TIMESTAMP(NOW()), pages_unique = pages_unique + {}, pages_total = pages_total + 1 WHERE id = %s'
-        self.sql(sql.format(int(url_id != last_id)), group_id)
         self.data['url_id'] = url_id
     
     def _track_start(self):
@@ -106,16 +130,32 @@ class SessionManager(object):
         account_id = self.data.get('account_id', 0)
         
         sql = ('INSERT INTO visit_groups'
-               ' (account_id, ip_id, user_agent_id, referrer_id, language_id, time_started, last_activity)'
-               ' VALUES (%s, %s, %s, %s, %s, UNIX_TIMESTAMP(NOW()), UNIX_TIMESTAMP(NOW()))')
+               ' (account_id, ip_id, user_agent_id, referrer_id, language_id)'
+               ' VALUES (%s, %s, %s, %s, %s)')
         group_id = self.sql(sql, account_id, self.data['ip_id'], self.data['ua_id'], self.data['referrer_id'], self.data['language_id'])
         self.data['group_id'] = group_id
 
+    def update_account_id(self):
+        """Update the visit group table with the account ID (if set)."""
+        try:
+            account_id = self.data['account_data'][id]
+            group_id = self.data['group_id']
+        except (KeyError, AttributeError):
+            return False
+        if not account_id:
+            return False
+        return self.sql('UPDATE visit_groups SET account_id = %s WHERE id = %s', account_id, group_id)
+       
     def regenerate(self):
+        """Regenerate the session with a new random ID."""
+        self.update_account_id()
         while True:
             session_id = uuid.uuid4().hex
             hash = quick_hash(session_id)
             if not self.sql('SELECT count(*) FROM temporary_storage WHERE id = %s', hash):
+                old_id = session.get('sid', None)
+                if old_id is not None:
+                    self.sql('DELETE FROM temporary_storage WHERE id = %s', old_id)
                 session['sid'] = session_id
                 self.hash = hash
                 self._new_id = True
@@ -128,11 +168,13 @@ class SessionManager(object):
         compressed = False
         
         #Compress if too large for blob
-        if data_len > 65535:
+        if data_len > self.MAX_LENGTH:
             data = zlib.compress(data)
+            if len(data) > self.MAX_LENGTH:
+                return self.new()
             compressed = True
             
         if self._new_id:
-            self.sql('INSERT INTO temporary_storage (id, data_pickle, data_len, compressed, last_activity) VALUES(%s, %s, %s, %s, UNIX_TIMESTAMP(NOW()))', self.hash, data, data_len, int(compressed))
+            self.sql('INSERT INTO temporary_storage (id, data_pickle, data_len, compressed) VALUES(%s, %s, %s, %s)', self.hash, data, data_len, int(compressed))
         else:
-            self.sql('UPDATE temporary_storage SET data_pickle = %s, data_len = %s, compressed = %s, last_activity = UNIX_TIMESTAMP(NOW()) WHERE id = %s', data, data_len, int(compressed), self.hash)
+            self.sql('UPDATE temporary_storage SET data_pickle = %s, data_len = %s, compressed = %s WHERE id = %s', data, data_len, int(compressed), self.hash)
