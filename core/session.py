@@ -13,7 +13,7 @@ import core.tracking as tracking
 
 SESSION_TIMEOUT = 3600
 
-from flask import request
+
 class SessionManager(object):
     
     MAX_LENGTH = 65535
@@ -25,7 +25,6 @@ class SessionManager(object):
     def __enter__(self):
         self._session_start()
         self._check_ban_ip()
-        self.generate_csrf_token()
         return self
         
     def __getitem__(self, item):
@@ -84,6 +83,7 @@ class SessionManager(object):
     def generate_csrf_token(self, override=False):
         if override or 'csrf_token' not in self.data:
             self.data['csrf_token'] = uuid.uuid4().hex
+            self.data['csrf_form'] = uuid.uuid4().hex
     
     def _check_ban_ip(self):
         """Don't allow IP to access site while banned."""
@@ -99,6 +99,7 @@ class SessionManager(object):
         self.data = {'account_data': {}}
         self._get_user_data()
         self._track_start()
+        self.generate_csrf_token()
     
     def _get_user_data(self):
         self.data['ip_id'] = tracking.get_ip_id(self.sql)
