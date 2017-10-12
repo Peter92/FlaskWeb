@@ -15,7 +15,7 @@
       <dt>Password (confirm):
       <dd><input type="password" name="password_confirm" value="{{ post_data.get('password_confirm', '') }}" {% if autofocus == 'password_confirm' %}autofocus{% endif %}>
       <dd><input type="submit" value="Register">
-      <input type="hidden" name="csrf_token" value="{{ session.get('csrf_token', post_data.get('csrf_token', '')) }}" />
+      <input type="hidden" name="{{ session.get('csrf_form', 'csrf_token') }}" value="{{ session.get('csrf_token', post_data.get('csrf_token', '')) }}" />
     </dl>
   </form>
 {% endblock %}
