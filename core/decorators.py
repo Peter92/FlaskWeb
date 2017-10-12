@@ -1,9 +1,12 @@
 #These are the decorators to be used with the function for each web page.
-#The order may go something like below:
+#@app.route must start followed by @session_start. @set_template if set should be the last in the list.
+#Anything in the middle may be in any order.
+#Example below:
 #
 #   @app.route('/account')
 #   @session_start(mysql)
 #   @require_login
+#   @csrf_protection
 #   @set_template('account.html')
 #   def account_page(session):
 #       return dict(account_id = session['account_id'])
@@ -19,6 +22,7 @@ import time
 
 from core.constants import *
 from core.session import SessionManager
+from core.tracking import *
     
 
 def set_template(template, status_code=200, mysql=None):
@@ -34,6 +38,8 @@ def set_template(template, status_code=200, mysql=None):
             result = func(*args, **kwargs)
             if result is None:
                 result = {}
+            
+            #Skip rendering template if a string was returned
             elif not isinstance(result, dict):
                 return result
             
@@ -64,7 +70,7 @@ def set_template(template, status_code=200, mysql=None):
     
 
 def _get_redirect_url(func, _add_queries={}, *args, **kwargs):
-
+    """Get current URL so things like login can redirect back to it."""
     try:
         redirect_url = url_for(func.__name__, **kwargs)
     except BuildError:
@@ -87,6 +93,7 @@ def _get_redirect_url(func, _add_queries={}, *args, **kwargs):
 
 
 def session_start(mysql):
+    """Wrap the code in the SessionManager class."""
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -97,6 +104,7 @@ def session_start(mysql):
 
     
 def require_admin(func):
+    """Result in 401 error if user is not admin."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         if kwargs['session'].get('account_data', {}).get('permission', 0) < PERMISSION_ADMIN:
@@ -106,6 +114,7 @@ def require_admin(func):
     
     
 def require_login(func):
+    """Load login page with redirection if user is not logged in."""
     @wraps(func)
     def wrapper(*args, **kwargs):
         if not kwargs['session'].get('account_data', {}).get('id', 0):
@@ -120,14 +129,37 @@ def require_login(func):
 def csrf_protection(func):
     """Stop cross-site request forgery attacks.
     Idea modified from http://flask.pocoo.org/snippets/3/
+    Added ideas from https://www.owasp.org/index.php/Cross-Site_Request_Forgery_(CSRF)_Prevention_Cheat_Sheet
+    
+    One token is generated per session, along with the field name for it.
+    The idea of generating one per form looks good on paper, 
+    but actually causes issues when resubmitting forms through browser controls.
+    
+    Possible bug (not tested):
+        Internet Explorer 11 does not add the Origin header on a CORS request across sites of a trusted zone. 
+        The Referer header will remain the only indication of the UI origin.
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
         if request.method == "POST":
-            token = kwargs['session'].get('csrf_token', None)
-            kwargs['session'].generate_csrf_token(override=True)
-            if not token or token != request.form.get('csrf_token', None):
+            
+            #Read headers
+            origin = get_origin() or get_referrer()
+            try:
+                if not origin:
+                    raise TypeError
+                origin_match = get_url_root().startswith(origin)
+            
+            #No origin or request headers
+            except TypeError:
+                origin_match = ACCEPT_REQUEST_WITH_NO_HEADERS
+                if not PRODUCTION_SERVER and not ACCEPT_REQUEST_WITH_NO_HEADERS:
+                    print 'Denied POST request due to no origin or referrer headers being present.'
+            
+            #Check CSRF token
+            if kwargs['session']['csrf_token'] != request.form.get(kwargs['session']['csrf_form'], None) or not origin_match:
                 abort(403)
+                
         return func(*args, **kwargs)
     return wrapper
 
