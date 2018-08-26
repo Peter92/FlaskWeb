@@ -10,14 +10,31 @@ from core.validation import *
 class DatabaseConnection(object):
 
     def __init__(self, host, database, user, password):
-        
-        #Not in use (but not sure if needed) - port: 3306, charset: utf8, use_unicode: True
-        self.connection = pymysql.connect(host=host, db=database, user=user, password=password)
-        self.cursor = self.connection.cursor()
+        self.host = host
+        self.database = database
+        self.user = user
+        self.password = password
+        self.refresh()
         self.command = DatabaseCommands(self)
-        
+    
+    def refresh(self):
+        self.connection = pymysql.connect(host=self.host, db=self.database, user=self.user, password=self.password)
+        self.cursor = self.connection.cursor()
+    
     def sql(self, sql, *args):
-        num_records = self.cursor.execute(sql, args)
+        """Basic sql commands with their outputs.
+        
+        Note: Using "cursor" as a variable name will crash the server, see here:
+        https://stackoverflow.com/questions/6650940
+        """
+        try:
+            num_records = c.execute(sql, args)
+            
+        #Restart mysql if it's died for whatever reason, seems quite common
+        except (pymysql.err.InterfaceError, pymysql.err.OperationalError):
+            self.refresh()
+            num_records = self.cursor.execute(sql, args)
+            
         self.connection.commit()
         
         if sql.startswith('SELECT count(*) FROM'):
@@ -196,7 +213,7 @@ class DatabaseCommands(object):
     
         data = {'account': {}, 'warnings': [], 'errors': []}
         
-        login_data = self.sql('SELECT password, email_id, username, password_changed, register_time, last_activity, credits, permission, activated, ban_until FROM accounts WHERE id = %s', account_id)
+        login_data = self.sql('SELECT password, email_id, username, password_time, register_time, last_activity, credits, permission, activated, ban_until FROM accounts WHERE id = %s', account_id)
         if login_data and password_check(password, login_data[0][0]):
             
             valid = 1
