@@ -61,7 +61,7 @@ def set_template(template, status_code=200, mysql=None):
             
             #Render the response
             response = render_template(template,
-                                       get_data=request.args, post_data=request.form, session=kwargs['session'],
+                                       get_data=request.args, post_data=request.form, session=kwargs.get('session', {}),
                                        login_url=_get_redirect_url(func, _add_queries={'login': '1'}),
                                        **result), status_code
             return _add_response_headers(response)
@@ -135,7 +135,7 @@ def csrf_protection(func):
     The idea of generating one per form looks good on paper, 
     but actually causes issues when resubmitting forms through browser controls.
     
-    Possible bug (not tested):
+    Requires proper testing (added quick fix):
         Internet Explorer 11 does not add the Origin header on a CORS request across sites of a trusted zone. 
         The Referer header will remain the only indication of the UI origin.
     """
@@ -148,7 +148,9 @@ def csrf_protection(func):
             try:
                 if not origin:
                     raise TypeError
-                origin_match = get_url_root().startswith(origin)
+                origin_match = '{}/'.format(origin).startswith(get_url_root())
+                if not PRODUCTION_SERVER and not origin_match:
+                    print 'Denied POST request due to origins not matching.'
             
             #No origin or request headers
             except TypeError:
@@ -165,16 +167,26 @@ def csrf_protection(func):
 
     
 def _add_response_headers(output):
-    """Add any custom headers to the page before it is processed."""
+    """Add any custom headers to the page before it is processed.
+
+    Worth looking at:
+        Content-Security-Policy: CSP not found on this site
+        Cookies: Cookies not using httpOnly or secure flags
+        Public-Key-Pins: HPKP not set on this site
+        Strict-Transport-Security: HSTS is OK
+    """
     
     resp = make_response(output)
     resp.headers['X-Frame-Options'] = "DENY"
     resp.headers['X-XSS-Protection'] = 1
     resp.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    #Disable caching
     if not PRODUCTION_SERVER:
         resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
         resp.headers['Pragma'] = 'no-cache'
         resp.headers['Expires'] = 0
+        
     return resp
     
     

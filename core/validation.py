@@ -2,10 +2,11 @@
 #This does not include database lookups
 from __future__ import absolute_import
 import re
+import os
 from functools import wraps
 
+from settings import APP_STATIC
 
-VALIDATION_ERROR_EXISTS = 0
 
 VALIDATION_ERROR_EMPTY = 1
 
@@ -53,8 +54,6 @@ def format_error_message(item_name, error_codes, unique_characters=None,
         errors.append('{} is required.'.format(item_name))
     
     else:
-        if VALIDATION_ERROR_EXISTS in error_codes:
-            errors.append('{} is already in use.'.format(item_name))
             
         if VALIDATION_ERROR_SHORT in error_codes:
             limit_text = ''
@@ -191,7 +190,7 @@ def validate_email(email, _error_ids):
                                 max_length=EMAIL_MAX_LENGTH)
 
 
-with open('static/used_passwords.txt', 'r') as f:
+with open(os.path.join(APP_STATIC, 'used_passwords.txt'), 'r') as f:
     COMMON_PASSWORDS = set(f.read().split('\n'))
 
 
