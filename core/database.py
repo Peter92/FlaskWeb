@@ -19,7 +19,7 @@ class DatabaseConnection(object):
     
     def refresh(self):
         self.connection = pymysql.connect(host=self.host, db=self.database, user=self.user, password=self.password)
-        self.cursor = self.connection.cursor()
+        #self.cursor = self.connection.cursor()
     
     def sql(self, sql, *args):
         """Basic sql commands with their outputs.
@@ -27,30 +27,34 @@ class DatabaseConnection(object):
         Note: Using "cursor" as a variable name will crash the server, see here:
         https://stackoverflow.com/questions/6650940
         """
+        cursor = self.connection.cursor()
         try:
-            num_records = c.execute(sql, args)
+            num_records = cursor.execute(sql, args)
             
         #Restart mysql if it's died for whatever reason, seems quite common
         except (pymysql.err.InterfaceError, pymysql.err.OperationalError):
             self.refresh()
-            num_records = self.cursor.execute(sql, args)
+            num_records = cursor.execute(sql, args)
             
         self.connection.commit()
         
-        if sql.startswith('SELECT count(*) FROM'):
-            return self.cursor.fetchall()[0][0]
-            
-        elif sql.startswith('SELECT'):
-            return self.cursor.fetchall()
-            
-        elif sql.startswith('UPDATE'):
-            return num_records
-            
-        elif sql.startswith('INSERT'):
-            return self.cursor.lastrowid
-            
-        elif sql.startswith('DELETE'):
-            return num_records
+        try:
+            if sql.startswith('SELECT count(*) FROM'):
+                return cursor.fetchall()[0][0]
+                
+            elif sql.startswith('SELECT'):
+                return cursor.fetchall()
+                
+            elif sql.startswith('UPDATE'):
+                return num_records
+                
+            elif sql.startswith('INSERT'):
+                return cursor.lastrowid
+                
+            elif sql.startswith('DELETE'):
+                return num_records
+        finally:
+            cursor.close()
             
 
 class DatabaseCommands(object):

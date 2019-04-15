@@ -1,0 +1,91 @@
+{% extends "layout.html" %}
+{% set active_page = 'email_template_edit' %}
+{% block title %}Edit Template{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <form action="{{ url_for('email_template_edit', template_id=t_id) }}" method="POST">
+    <div class="row">
+      <p>
+        <strong>Name:</strong> user-register
+        <br/>
+        <strong>Last edited:</strong> About a year ago
+        <br/>
+        <strong>Last sent:</strong> About a year ago
+        <br/>
+        <strong>Times sent:</strong> 4
+        <br/>
+        <strong>Times read:</strong> 2 (50% of total)
+        <br/>
+        <strong>Times opened:</strong> 2 (1 view per email)
+      </p>
+    </div>
+    <div class="row">
+      <p>
+        <strong>Replacement Values:</strong>
+        <br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;[EMAILADDRESS] - Email address linked to account.
+        <br/>
+        &nbsp;&nbsp;&nbsp;&nbsp;[USERNAME] - Username (or first part of email if not set).
+      </p>
+    </div>
+    <div class="row">
+      <p>
+        <label for="template_name">Template Name:</label>
+        <input name="template_name" class="form-control" id="template_name" type="text" placeholder="Set the template name (lowercase and dashes only)." value="{% if template_name %}{{ template_name }}{% else %}{{ post_data.get('template_name', '') }}{% endif %}"/>
+      </p>
+    </div>
+    <div class="row">
+      <p>
+        <label for="email_subject">Subject:</label>
+        <input name="email_subject" class="form-control" id="email_subject" type="text" placeholder="Type the email subject." value="{% if email_subject %}{{ email_subject }}{% else %}{{ post_data.get('email_subject', '') }}{% endif %}"/>
+      </p>
+    </div>
+    <div class="row">
+      <p>
+        <label for="email_content">Message (You <i>do{% if not allow_html %} not{% endif %}</i> have permission to use HTML):</label>
+        <textarea name="email_content" class="form-control" id="email_content" type="text" placeholder="Type the email message.">{% if email_content %}{{ email_content }}{% else %}{{ post_data.get('email_content', '') }}{% endif %}</textarea>
+      </p>
+    </div>
+    <div class="row">
+      <p>
+        <div class="pull-left">
+          <input type="submit" value="Save" name="submit_save" class="btn btn-primary"/>
+        </div>
+        <div class="pull-left">
+          &nbsp;&nbsp;
+        </div>
+        <div class="pull-left">
+          <input type="submit" value="Preview" name="submit_preview" class="btn btn-primary"/>
+        </div>
+        <div class="pull-right">
+          <input type="submit" value="Go Back" name="submit_back" class="btn btn-primary" formaction="{{ url_for('email_template_list') }}"/>
+        </div>
+        <div class="pull-right">
+          &nbsp;&nbsp;
+        </div>
+      </p>
+    </div>
+  </form>
+  <p>
+    &nbsp;
+  </p>
+  {% if email_preview %}
+    <div class="row">
+      <p>
+        <strong>{{ email_preview['subject'] }}</strong>
+      </p>
+      <p>
+        {{ email_preview['body'] | safe }}
+      </p>
+      {% if 'plain' in email_preview %}
+        <p>
+          <strong>{{ email_preview['subject'] }}</strong> (plaintext)
+        </p>
+        <p>
+          {{ email_preview['plain'] | safe }}
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

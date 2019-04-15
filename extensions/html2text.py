@@ -1,6 +1,6 @@
 #https://stackoverflow.com/a/15609065/2403000
 from __future__ import absolute_import
-from html import escape
+#from html import escape
 import HTMLParser
 import re
 
@@ -56,5 +56,5 @@ def html2text(html=None):
     return text.strip()
     
     
-def escape_html(html):
-    return escape(html).encode('ascii', 'xmlcharrefreplace')
+#def escape_html(html):
+#    return escape(html).encode('ascii', 'xmlcharrefreplace')
