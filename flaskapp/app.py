@@ -7,7 +7,7 @@ from flask import Flask
 
 # Add the repo to the path
 sys.path.append(os.path.abspath(__file__).rsplit(os.path.sep, 2)[0])
-from flaskapp.models import *
+from flaskapp.database import *
 
 
 app = Flask(__name__)

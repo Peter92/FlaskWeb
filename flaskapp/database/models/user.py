@@ -2,18 +2,10 @@ from __future__ import absolute_import
 
 import time
 
-from flask_sqlalchemy import SQLAlchemy
+from ..connect import db
 
 
-__all__ = ['db', 'User', 'Email']
-
-
-db = SQLAlchemy()
-
-
-def unix_timestamp():
-    """Get the current unix timestamp."""
-    return int(time.time())
+__all__ = ['User', 'Email']
 
 
 class User(db.Model):
@@ -52,4 +44,4 @@ class Email(db.Model):
 def password_edited(target, value, oldvalue, initiator):
     """Update password edited time"""
     if value != oldvalue:
-        target.password_edited = unix_timestamp()
+        target.password_edited = int(time.time())
