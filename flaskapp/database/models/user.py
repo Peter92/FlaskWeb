@@ -35,6 +35,12 @@ class User(db.Model):
     password_resets = db.relationship('PasswordReset', lazy=True)
     persistent_logins = db.relationship('PersistentLogin', lazy=True)
 
+    # Other
+    @hybrid_property
+    def identifier(self):
+        """Generate an identifier unique to the email and password."""
+        return quick_hash(self.password + self.email.address)
+
     # Validation
     @validates('email')
     def validate_email(self, key, email):
@@ -255,14 +261,6 @@ class PersistentLogin(db.Model):
     # Relationships
     user = db.relationship('User')
 
-    # Other
-    @hybrid_property
-    def identifier_user(self):
-        """Generate the 2nd part of the identifier.
-        If anything used here is changed, the user will be logged out.
-        """
-        return quick_hash(self.user.password + self.user.email.address)
-
     # Validators
     @validates('user')
     def validate_email(self, key, user):
@@ -277,7 +275,7 @@ class PersistentLogin(db.Model):
     # Overrides
     def __init__(self, user, token):
         super(PersistentLogin, self).__init__(user=user, token=token)
-        self.identifier = quick_hash() + self.identifier_user
+        self.identifier = quick_hash() + user.identifier
 
     def __repr__(self):
         return '<{} "{}">'.format(self.__class__.__name__, self.user.email.address)
@@ -294,15 +292,19 @@ class PersistentLogin(db.Model):
             session = PersistentLogin.query.filter(PersistentLogin.token==token).one()
         except exc.NoResultFound:
             return None
-        
+
         # Find if identifier is valid
         if session.identifier != identifier:
-            if session.identifier[64:128] != session.identifier_user:
-                all_sessions = PersistentLogin.query.filter(PersistentLogin.identifier==session.identifier)
+            if session.identifier[64:128] == session.user.identifier:
+                all_sessions = PersistentLogin.query.filter(PersistentLogin.user.identifier==session.identifier)
                 all_sessions.delete()
                 db.session.commit()
             return None
+        # Check the user identifier in case email/password has been changed
+        elif session.identifier[64:128] != session.user.identifier:
+            return None
 
+        # Return the session with a new token
         return (session, session.regenerate_token())
 
     def regenerate_token(self):
