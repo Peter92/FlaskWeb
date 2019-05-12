@@ -28,7 +28,8 @@ db.session.add(admin)
 db.session.add(guest)
 db.session.commit()
 
-print(admin.email.users)
+admin.email = 'new@admin.com'
+admin.password = 'pw'
 
 # Pages
 @app.route('/user/<int:row_id>')
