@@ -1,10 +1,14 @@
 from __future__ import absolute_import
+
 import hashlib
 import base64
 import bcrypt
+import uuid
 
 
-def quick_hash(x):
+def quick_hash(x=None):
+    if x is None:
+        x = uuid.uuid4().hex
     return hashlib.sha256(str(x)).hexdigest()
 
 

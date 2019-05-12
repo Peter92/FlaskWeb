@@ -31,6 +31,12 @@ db.session.commit()
 admin.email = 'new@admin.com'
 admin.password = 'pw'
 
+p = PersistentLogin(user=admin, token='462642')
+db.session.add(p)
+db.session.commit()
+
+session, new_token = PersistentLogin.get_session(admin, '462642', p.identifier)
+
 # Pages
 @app.route('/user/<int:row_id>')
 def test_page(row_id):

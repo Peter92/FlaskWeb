@@ -1,7 +1,8 @@
-class Permissions(object):
-    Banned = 3
+class UserPermissions(object):
+    Deleted = 0
+    Banned = 5
     ShadowBanned = 7
-    User = 15
-    Activated = 31
+    Default = 15
+    Activated = 21
     Admin = 240
     Owner = 255
