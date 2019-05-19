@@ -1,0 +1,28 @@
+.sidebar {
+	padding-top: 1rem;
+}
+.sidebar-links {
+  padding-left: 1rem;
+}
+/* Pad out all main links that aren't at the top */
+.sidebar-links ul li{
+	padding-top: 0.25rem;
+}
+.sidebar-links ul ul{
+	padding-left: 1rem;
+	font-size: 90%;
+}
+.sidebar-links ul ul li,
+.sidebar-links ul li:first-child {
+	padding-top: 0rem;
+}
+/* Change link hover colours */
+.sidebar-link:hover {
+	color: black;
+	font-weight: 500;
+	text-decoration-line: none;
+}
+.sidebar-link-active:not(hover) {
+	font-weight: 500;
+	font-size: 110%;
+}

@@ -1,0 +1,124 @@
+/* Custom page header */
+.nav-main {
+  padding-top: 1.5rem;
+  padding-bottom: 1rem;
+}
+/* Make the masthead heading the same height as the navigation */
+.nav-main h3 {
+  margin-top: 0;
+  margin-bottom: 0;
+  line-height: 3rem;
+}
+.nav-border {
+  border-bottom: .05rem solid #e5e5e5;
+  margin-bottom: 2rem;
+}
+
+/* Custom page footer */
+.footer {
+  padding-top: 1.5rem;
+  padding-bottom: 1rem;
+  color: #777;
+  border-top: .05rem solid #e5e5e5;
+}
+
+
+.lead {
+	font-size: 1.18rem;
+}
+.lead code {
+	font-size: 0.95rem;
+}
+.container-fluid{
+	background-color: #F4F4F4;
+}
+.container{
+	background-color: #FFF;
+}
+.container-transparent,
+.container-fluid-transparent {
+	background-color: transparent;
+}
+.fill {
+    min-height: 100vh;
+}
+
+/* Thin out the marketing headings */
+h2 {
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: -.05rem;
+  font-size: 2.5rem;
+}
+h2 span {
+	font-size: 20px;
+}
+
+/* Hide mobile navigation bar */
+@media (min-width: 48em) {
+	.nav-mobile {
+		display: none !important;
+	}
+}
+/* Switch to mobile formatting */
+@media (max-width: 48em){
+	.nav-main {
+		display: none !important;
+	}
+	.container {
+		padding-top: 2rem;
+	}
+	.nav-mobile-container {
+		padding-top: 0rem;
+		background-color: inherit;
+	}
+	.navbar-brand,
+	.nav-item {
+		padding-left: 1rem;
+	}
+	h2 {
+		font-size: 2.25rem;
+	}
+}
+/* Disable container if width is too small */
+@media (max-width: 36em) {
+	.nav-mobile-container {
+		width: 100%;
+	}
+}
+
+
+.link-colour-reverse:link,
+.link-colour-reverse:visited {
+	color: inherit;
+	text-decoration-line: inherit;
+}
+.link-colour-reverse:hover {
+	color: #428bca !important;
+}
+.link-hover-bold:hover {
+	font-weight: 500;
+}
+.link-colour-grey:link,
+.link-colour-grey:visited {
+	color: gray;
+}
+
+/*
+.sidebar-links a:link,
+.sidebar-links a:visited{
+	color: black;
+	text-decoration-line: none;
+}
+.sidebar-links ul ul a:link,
+.sidebar-links ul ul a:visited{
+	color: gray;
+}
+.sidebar-links a:hover {
+	color: #428bca;
+	font-weight: 500;
+}
+.sidebar-links ul ul a:hover {
+	color: #428bca;
+	font-weight: 500;
+}*/

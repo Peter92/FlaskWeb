@@ -1,0 +1,135 @@
+.carousel {
+  position: relative;
+  top: 0;
+  left: 0;
+}
+.carousel-fade .carousel-item {
+  display: block;
+  position: relative;
+  opacity: 0;
+  transition: opacity .75s ease-in-out;
+}
+.carousel-fade .carousel-item.active {
+  opacity: 1;
+  display: block;
+}
+a.carousel-control-next:link, a.carousel-control-prev:link {
+  background-color: transparent;
+  text-decoration: none;
+  opacity: .5;
+}
+a.carousel-control-next:hover, a.carousel-control-prev:hover  {
+  background-color: transparent;
+  text-decoration: none;
+  opacity: 1;
+}
+.carousel-control-next-icon, .carousel-control-prev-icon {
+  position: relative;
+  background-image: none;
+}    
+.carousel-control-next-icon:before {
+  top:0;
+  left:-5px;
+  padding-right:10px;
+ }
+.carousel-control-prev-icon:before {
+  top:0;
+  left:-5px;
+  padding-right:10px;
+}
+.carousel-overlay {
+	position: absolute;
+	top: 120px;
+	padding-left: 40px;
+	padding-right: 40px;
+	color: white;
+	text-shadow: 1px 1px 1px rgba(0,0,0,.75);
+}
+
+
+/* Adjust size based on screen size */
+/* limit width example: @media (max-width: 75em) and (min-width: 62em) { */
+.carousel-overlay {
+	top: 120px;
+}
+.carousel-overlay h1 {
+	font-size: 3.5em;
+}
+.carousel-overlay p {
+	font-size: 1.2em;
+}
+.carousel-overlay a {
+	margin-bottom: 4px;
+}
+.carousel-buttons {
+	padding-top: 1.5rem;
+}
+@media (max-width: 75em){
+  .carousel-overlay h1 {
+	font-size: 3em;
+  }
+  .carousel-overlay p {
+	font-size: 1.2em;
+  }
+}
+@media (max-width: 62em){
+  .carousel-overlay h1 {
+	font-size: 2.3em;
+  }
+ .carousel-overlay p {
+	font-size: 1em;
+ }
+  .carousel-overlay a {
+	font-size: 1em;
+  }
+}
+@media (max-width: 48em){
+  .carousel-overlay {
+	top: 60px;
+  }
+  .carousel-overlay h1 {
+	font-size: 2.2em;
+  }
+  .carousel-overlay a {
+	font-size: 0.9em;
+  }
+}
+@media (max-width: 34em){
+	.carousel-overlay {
+		top: 40px;
+	}
+	.carousel-overlay h1 {
+		font-size: 1.9em;
+	}
+	  .carousel-overlay a {
+		font-size: 0.9em;
+  	}
+  	.carousel-overlay p {
+		font-size: 0.9em;
+  	}
+	.carousel-buttons {
+		padding-top: 1rem;
+	}
+}
+@media (max-width: 26em){
+	.carousel-overlay {
+		top: 30px;
+	}
+  	.carousel-overlay h1 {
+		font-size: 1.85em;
+  	}
+  	.carousel-overlay a {
+		font-size: 0.8em;
+  	}
+	.carousel-buttons {
+		padding-top: 0.5rem;
+	}
+}
+@media (max-width: 24em){
+  	.carousel-overlay {
+		top: 10px;
+  	}
+  	.carousel-overlay h1 {
+		font-size: 1.7em;
+  	}
+}
