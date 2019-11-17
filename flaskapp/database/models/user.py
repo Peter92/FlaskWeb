@@ -38,14 +38,20 @@ class User(db.Model):
     # Other
     @hybrid_property
     def identifier(self):
-        """Generate an identifier unique to the email and password."""
-        return quick_hash(self.password + self.email.address)
-
+        """Generate an identifier unique to the email and password.
+        This is for the use of sessions.
+        """
+        return quick_hash(self.password + self.email.address.encode('utf-8'))
+        
     # Validation
     @validates('email')
-    def validate_email(self, key, email):
-        if not isinstance(email, Email):
-            email = Email(email)
+    def validate_email(self, key, address):
+        if isinstance(address, Email):
+            email = address
+        else:
+            email = Email.query.filter(Email.address==address).first()
+            if email is None:
+                email = Email(address)
         return email
 
     @validates('password')
@@ -99,7 +105,7 @@ class Email(db.Model):
     # Validators
     @validates('address')
     def validate_address(self, key, address):
-        assert '@' in address
+        assert '.' in address.split('@')[1]
         return address
 
     # Overrides
@@ -142,7 +148,7 @@ class Activation(db.Model):
     @validates('user')
     def validate_email(self, key, user):
         if not isinstance(user, User):
-            user = User(user)
+            return User.query.filter(User.username==user).one()
         return user
 
     @validates('code')
@@ -179,7 +185,7 @@ class LoginAttempts(db.Model):
     @validates('email')
     def validate_email(self, key, email):
         if not isinstance(email, Email):
-            email = Email(email)
+            return Email.query.filter(Email.address==email).one()
         return email
 
     # Overrides
@@ -214,7 +220,7 @@ class PasswordReset(db.Model):
     @validates('user')
     def validate_email(self, key, user):
         if not isinstance(user, User):
-            user = User(user)
+            return User.query(User.username==user).one()
         return user
 
     @validates('code')
