@@ -1,13 +1,12 @@
-from __future__ import absolute_import
-
 import time
 import uuid
+from flask import jsonify
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import exc, validates
 
 from ..connect import db
+from ..constants import UserPermission
 from ..misc import generate_uuid, unix_timestamp
-from ...constants import UserPermissions
 from ...utils.hash import quick_hash, password_hash
 
 
@@ -22,7 +21,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=True)
     password = db.Column(db.CHAR(60), nullable=False)
     activated = db.Column(db.Boolean, default=0)
-    permissions = db.Column(db.SmallInteger, default=UserPermissions.Default)
+    permission = db.Column(db.SmallInteger, default=UserPermission.Default)
 
     # Automatic
     password_edited = db.Column(db.Integer, nullable=False)
@@ -65,6 +64,12 @@ class User(db.Model):
     def __repr__(self):
         return '<{} "{} ({})">'.format(self.__class__.__name__, self.username, self.email.address)
 
+    def json(self):
+        return jsonify(
+            username=self.username,
+            email=self.email.address,
+        )
+
 
 @db.event.listens_for(User, 'before_insert')
 def user_insert(mapper, connection, target):
@@ -88,7 +93,7 @@ def user_password_update(target, value, oldvalue, initiator):
 class Email(db.Model):
     """Email addresses.
     More than one account can have the same email, but the intention is that it will have the
-    permission of UserPermissions.Deleted.
+    permission of UserPermission.Deleted.
     """
     # Columns
     row_id = db.Column(db.Integer, primary_key=True)

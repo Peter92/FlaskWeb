@@ -1,4 +1,4 @@
-class UserPermissions(object):
+class UserPermission(object):
     Deleted = 0
     Banned = 5
     ShadowBanned = 7
