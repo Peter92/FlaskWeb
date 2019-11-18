@@ -9,7 +9,7 @@ import uuid
 def quick_hash(x=None):
     if x is None:
         x = uuid.uuid4().hex
-    return hashlib.sha256(str(x).encode('utf-8')).hexdigest()
+    return hashlib.sha256(str(x).encode('utf-8')).digest()
 
 
 def _reduce_long_password(password):

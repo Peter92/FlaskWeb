@@ -6,7 +6,7 @@ from sqlalchemy.orm import exc, validates
 
 from ..connect import db
 from ..constants import UserPermission
-from ..misc import generate_uuid, unix_timestamp
+from ...common import generate_uuid, unix_timestamp
 from ...utils.hash import quick_hash, password_hash
 
 
@@ -15,26 +15,24 @@ __all__ = ['User', 'Email', 'Activation', 'LoginAttempts', 'PasswordReset', 'Per
 
 class User(db.Model):
     """User accounts."""
-    # Columns
+    __tablename__ = 'User'
+
     row_id = db.Column(db.Integer, primary_key=True)
-    email_id = db.Column(db.Integer, db.ForeignKey('email.row_id'), nullable=False)
+    email_id = db.Column(db.Integer, db.ForeignKey('Email.row_id'), nullable=False)
     username = db.Column(db.String(80), unique=True, nullable=True)
     password = db.Column(db.CHAR(60), nullable=False)
     activated = db.Column(db.Boolean, default=0)
     permission = db.Column(db.SmallInteger, default=UserPermission.Default)
 
-    # Automatic
     password_edited = db.Column(db.Integer, nullable=False)
     created = db.Column(db.Integer, nullable=False)
     updated = db.Column(db.Integer, nullable=False)
     
-    # Relationships
     email = db.relationship('Email')
     activation_codes = db.relationship('Activation', lazy=True)
     password_resets = db.relationship('PasswordReset', lazy=True)
     persistent_logins = db.relationship('PersistentLogin', lazy=True)
 
-    # Other
     @hybrid_property
     def identifier(self):
         """Generate an identifier unique to the email and password.
@@ -42,7 +40,6 @@ class User(db.Model):
         """
         return quick_hash(self.password + self.email.address.encode('utf-8'))
         
-    # Validation
     @validates('email')
     def validate_email(self, key, address):
         if isinstance(address, Email):
@@ -57,7 +54,6 @@ class User(db.Model):
     def validate_password(self, key, password):
         return password_hash(password)
 
-    # Overrides
     def __init__(self, email, password, username=None):
         super(User, self).__init__(email=email, password=password, username=username)
 
@@ -95,25 +91,22 @@ class Email(db.Model):
     More than one account can have the same email, but the intention is that it will have the
     permission of UserPermission.Deleted.
     """
-    # Columns
+    __tablename__ = 'Email'
+
     row_id = db.Column(db.Integer, primary_key=True)
     address = db.Column(db.String(128), unique=True, nullable=False)
 
-    # Automatic
     created = db.Column(db.Integer, nullable=False)
     updated = db.Column(db.Integer, nullable=False)
 
-    # Relationships
     users = db.relationship('User', lazy=True)
     login_attempts = db.relationship('LoginAttempts', lazy=True)
 
-    # Validators
     @validates('address')
     def validate_address(self, key, address):
         assert '.' in address.split('@')[1]
         return address
 
-    # Overrides
     def __init__(self, address):
         super(Email, self).__init__(address=address)
 
@@ -138,18 +131,16 @@ class Activation(db.Model):
     allocated time will activate their account.
     If a new activation code is sent, then delete this record.
     """
-    # Columns
-    row_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.row_id'), nullable=False)
-    code = db.Column(db.CHAR(64), nullable=False, unique=True)
+    __tablename__ = 'Activation'
 
-    # Automatic
+    row_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('User.row_id'), nullable=False)
+    code = db.Column(db.CHAR(32), nullable=False, unique=True)
+
     created = db.Column(db.Integer, nullable=False)
 
-    # Relationships
     user = db.relationship('User')
 
-    # Validators
     @validates('user')
     def validate_email(self, key, user):
         if not isinstance(user, User):
@@ -160,7 +151,6 @@ class Activation(db.Model):
     def validate_code(self, key, code):
         return quick_hash(code)
 
-    # Overrides
     def __init__(self, user, token):
         super(PasswordReset, self).__init__(user=user, code=code)
 
@@ -175,25 +165,22 @@ def activation_insert(mapper, connection, target):
 
 class LoginAttempts(db.Model):
     """Keep track of failed login attempts."""
-    # Columns
+    __tablename__ = 'LoginAttempts'
+    
     row_id = db.Column(db.Integer, primary_key=True)
-    email_id = db.Column(db.Integer, db.ForeignKey('email.row_id'), nullable=False)
+    email_id = db.Column(db.Integer, db.ForeignKey('Email.row_id'), nullable=False)
     success = db.Column(db.Boolean, default=0)
 
-    # Automatic
     created = db.Column(db.Integer, nullable=False)
 
-    # Relationships
     email = db.relationship('Email')
 
-    # Validators
     @validates('email')
     def validate_email(self, key, email):
         if not isinstance(email, Email):
             return Email.query.filter(Email.address==email).one()
         return email
 
-    # Overrides
     def __init__(self, email, success):
         super(PasswordReset, self).__init__(email=email, success=success)
 
@@ -210,18 +197,16 @@ class PasswordReset(db.Model):
     """Reset user account password.
     Make sure to delete this record as soon as its used.
     """
-    # Columns
+    __tablename__ = 'PasswordReset'
+    
     row_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.row_id'), nullable=False)
-    code = db.Column(db.CHAR(64), nullable=False, unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('User.row_id'), nullable=False)
+    code = db.Column(db.CHAR(32), nullable=False, unique=True)
 
-    # Automatic
     created = db.Column(db.Integer, nullable=False)
 
-    # Relationships
     user = db.relationship('User')
 
-    # Validators
     @validates('user')
     def validate_email(self, key, user):
         if not isinstance(user, User):
@@ -232,7 +217,6 @@ class PasswordReset(db.Model):
     def validate_code(self, key, code):
         return quick_hash(code)
 
-    # Overrides
     def __init__(self, user, token):
         super(PasswordReset, self).__init__(user=user, code=code)
 
@@ -259,20 +243,18 @@ class PersistentLogin(db.Model):
         This is just a basic check of whether it exists or not.
         If a match, generate a fresh token and overwrite.
     """
-    # Columns
-    row_id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.row_id'), nullable=False)
-    identifier = db.Column(db.CHAR(128), unique=True)
-    token = db.Column(db.CHAR(64), unique=True)
+    __tablename__ = 'PersistentLogin'
 
-    # Automatic
+    row_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('User.row_id'), nullable=False)
+    identifier = db.Column(db.CHAR(64), unique=True)
+    token = db.Column(db.CHAR(32), unique=True)
+
     created = db.Column(db.Integer, nullable=False)
     updated = db.Column(db.Integer, nullable=False)
 
-    # Relationships
     user = db.relationship('User')
 
-    # Validators
     @validates('user')
     def validate_email(self, key, user):
         if not isinstance(user, User):
@@ -283,7 +265,6 @@ class PersistentLogin(db.Model):
     def validate_token(self, key, token):
         return quick_hash(token)
 
-    # Overrides
     def __init__(self, user, token):
         super(PersistentLogin, self).__init__(user=user, token=token)
         self.identifier = quick_hash() + user.identifier
@@ -291,7 +272,6 @@ class PersistentLogin(db.Model):
     def __repr__(self):
         return '<{} "{}">'.format(self.__class__.__name__, self.user.email.address)
 
-    # Extra
     @classmethod
     def get_session(cls, user, token, identifier):
         """Use the token and identifier to get the current session.
@@ -299,20 +279,19 @@ class PersistentLogin(db.Model):
         """
         # Find record with matching token
         token = quick_hash(token)
-        try:
-            session = PersistentLogin.query.filter(PersistentLogin.token==token).one()
-        except exc.NoResultFound:
+        session = PersistentLogin.query.filter(PersistentLogin.token==token).first()
+        if session is None:
             return None
 
         # Find if identifier is valid
         if session.identifier != identifier:
-            if session.identifier[64:128] == session.user.identifier:
+            if session.identifier[32:64] == session.user.identifier:
                 all_sessions = PersistentLogin.query.filter(PersistentLogin.user.identifier==session.identifier)
                 all_sessions.delete()
                 db.session.commit()
             return None
         # Check the user identifier in case email/password has been changed
-        elif session.identifier[64:128] != session.user.identifier:
+        elif session.identifier[32:64] != session.user.identifier:
             return None
 
         # Return the session with a new token
