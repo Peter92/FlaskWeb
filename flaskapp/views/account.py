@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 
 from ..database import *
+from ..decorators import *
 
 
 app = Blueprint(__name__, __name__, template_folder='templates')
@@ -21,8 +22,9 @@ def test_page(username=None):
 
 
 @app.route('/login')
+@set_template('login.html')
 def login():
-    pass
+    return {'errors': ['Invalid username', 'Invalid password']}
 
 
 @app.route('/register')

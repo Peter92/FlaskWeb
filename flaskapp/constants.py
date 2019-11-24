@@ -1,3 +1,6 @@
+# Determines if things like browser caching should be used
+PRODUCTION_SERVER = False
+
 # Pick a directory to store the session data
 SESSION_DIR = 'D:/Session'
 
