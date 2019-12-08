@@ -9,6 +9,7 @@ from flaskapp.database import *
 from flaskapp.views import blueprints
 
 app = Flask(__name__)
+app.debug = True
 app.secret_key = 123
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False

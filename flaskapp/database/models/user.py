@@ -104,7 +104,8 @@ class Email(db.Model):
 
     @validates('address')
     def validate_address(self, key, address):
-        assert '.' in address.split('@')[1]
+        if '.' not in address.split('@')[1] or '@' in (address[0], address[-1]):
+            raise ValueError('Invalid email address')
         return address
 
     def __init__(self, address):

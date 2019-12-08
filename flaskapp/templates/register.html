@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+{% block title %}
+  Register
+{% endblock %}
+{% block header %}
+  Register
+{% endblock %}
+{% block body %}
+  <form action="{{ url_for('flaskapp.views.account.register') }}" method="post">
+    <div class="form-group">
+      <label for="email">Email Address</label>
+      <input type="email" class="form-control" name="email" value="{{ request.form.get('email', '') }}" {% if autofocus == 'email' %}autofocus{% endif %}, aria-describedby="email_help">
+      <small id="email_help" class="form-text text-muted">We'll never share your email with anyone else.</small>
+    </div>
+    <div class="form-group">
+      <label for="username">Username (optional)</label>
+      <input class="form-control" name="username" value="{{ request.form.get('username', '') }}" {% if autofocus == 'username' %}autofocus{% endif %}>
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" class="form-control" name="password" value="{{ request.form.get('password', '') }}" {% if autofocus == 'password' %}autofocus{% endif %}>
+    </div>
+    <div class="form-group">
+      <label for="password">Retype Password</label>
+      <input type="password" class="form-control" name="password2" value="{{ request.form.get('password2', '') }}" {% if autofocus == 'password2' %}autofocus{% endif %}>
+    </div>
+    <input type="submit" class="btn btn-primary" value="Register">
+  </form>
+{% endblock %}
